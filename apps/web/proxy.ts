@@ -25,7 +25,7 @@ export async function proxy(request: NextRequest) {
     ) || (request.nextUrl.pathname.startsWith('/member') && !['/member/sign-in','/member/link'].includes(request.nextUrl.pathname)))
   ) {
     const redirect = NextResponse.redirect(
-      new URL(request.nextUrl.pathname.startsWith('/member')?'/member/sign-in':'/sign-in', process.env.WEB_ORIGIN || 'http://localhost:3000'),
+      new URL(request.nextUrl.pathname.startsWith('/member')?'/member/sign-in':'/sign-in', process.env.WEB_ORIGIN || request.nextUrl.origin),
     );
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     redirect.headers.set('Cache-Control', 'private, no-store');

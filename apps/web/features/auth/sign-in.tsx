@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { browserAuth } from '@/lib/supabase/client';
 import { inviteStorageKey } from '@/lib/api/auth-api';
+import { oauthDestinationCookie } from '@/lib/auth-redirect';
 import { AuthPanel } from '@/components/auth-panel';
 function SignInContent({memberMode=false}:{memberMode?:boolean}) {
   const params = useSearchParams();
@@ -64,8 +65,9 @@ function SignInContent({memberMode=false}:{memberMode?:boolean}) {
         disabled={busy}
         onClick={() =>
           run(async () => {
+            const next = destination();
+            document.cookie = `${oauthDestinationCookie}=${encodeURIComponent(next)}; Path=/auth/callback; Max-Age=600; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
             const redirect = new URL('/auth/callback', location.origin);
-            redirect.searchParams.set('next', destination());
             const { error } = await browserAuth().auth.signInWithOAuth({
               provider: 'google',
               options: { redirectTo: redirect.href },
