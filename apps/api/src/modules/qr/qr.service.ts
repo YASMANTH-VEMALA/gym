@@ -25,27 +25,32 @@ export function resolveQrWebOrigin(
   configuredOrigin?: string,
   requestOrigin?: string,
 ): string {
-  const candidate = requestOrigin?.trim() || configuredOrigin?.trim();
-  if (!candidate) return 'http://localhost:3000';
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    throw new ServiceUnavailableException(
-      'A valid public web origin is required',
-    );
-  }
-  if (
-    url.protocol !== 'https:' &&
-    !(
-      url.protocol === 'http:' &&
-      ['localhost', '127.0.0.1'].includes(url.hostname)
+  const parse = (candidate?: string) => {
+    if (!candidate?.trim()) return undefined;
+    let url: URL;
+    try {
+      url = new URL(candidate.trim());
+    } catch {
+      throw new ServiceUnavailableException(
+        'A valid public web origin is required',
+      );
+    }
+    if (
+      url.protocol !== 'https:' &&
+      !(
+        url.protocol === 'http:' &&
+        ['localhost', '127.0.0.1'].includes(url.hostname)
+      )
     )
-  )
-    throw new ServiceUnavailableException(
-      'A secure public web origin is required',
-    );
-  return url.origin;
+      throw new ServiceUnavailableException(
+        'A secure public web origin is required',
+      );
+    return url;
+  };
+  const configured = parse(configuredOrigin);
+  const requested = parse(requestOrigin);
+  if (configured?.protocol === 'https:') return configured.origin;
+  return requested?.origin || configured?.origin || 'http://localhost:3000';
 }
 
 @Injectable()

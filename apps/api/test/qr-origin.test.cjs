@@ -10,6 +10,16 @@ test('QR links prefer the deployed browser origin over a localhost fallback', ()
   );
 });
 
+test('QR links never let a localhost browser override production configuration', () => {
+  assert.equal(
+    resolveQrWebOrigin(
+      'https://gym-web-chi-one.vercel.app',
+      'http://localhost:3000',
+    ),
+    'https://gym-web-chi-one.vercel.app',
+  );
+});
+
 test('QR links retain configured and local-development fallbacks', () => {
   assert.equal(
     resolveQrWebOrigin('https://gym.example.com'),
