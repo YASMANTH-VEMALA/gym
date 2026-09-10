@@ -1,0 +1,43 @@
+{
+  "name": "gym-saas",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint && eslint playwright.config.ts playwright.auth.config.ts e2e",
+    "typecheck": "turbo run typecheck && tsc -p tsconfig.e2e.json",
+    "dev:web": "turbo run dev --filter=@gym/web",
+    "dev:api": "turbo run dev --filter=@gym/api",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:e2e": "playwright test",
+    "test:auth": "turbo run build --filter=@gym/api && node --test apps/api/test/auth.test.cjs",
+    "test:money": "npm run build --workspace=@gym/validation && node --test packages/validation/test/money.test.cjs",
+    "test:member-profile": "npm run build --workspace=@gym/validation && node --test packages/validation/test/member-profile.test.cjs",
+    "test:integration": "turbo run build --filter=@gym/api && node --test apps/api/test/auth.integration.test.cjs",
+    "test:e2e:auth": "turbo run build --filter=@gym/api && playwright test --config=playwright.auth.config.ts",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.0.0",
+    "turbo": "^2.0.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.0.0"
+  }
+}

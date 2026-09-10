@@ -1,0 +1,167 @@
+@import 'tailwindcss';
+@source "../../../packages/ui/src";
+@custom-variant dark (&:is(.dark *));
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  [data-print-qr],
+  [data-print-qr] * {
+    visibility: visible;
+  }
+  [data-print-qr] {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px;
+  }
+  [data-print-qr] .print-only {
+    display: block;
+  }
+  [data-print-qr] .no-print {
+    display: none;
+  }
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}
+
+@layer components {
+  .auth-page {
+    @apply min-h-screen bg-slate-50 flex items-center justify-center p-5;
+  }
+  .auth-card {
+    @apply w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-5;
+  }
+  .brand {
+    @apply text-sm font-bold tracking-widest text-blue-700;
+  }
+  h1 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  h2 {
+    @apply text-lg font-semibold;
+  }
+  .muted {
+    @apply text-sm text-slate-600;
+  }
+  form {
+    @apply space-y-4;
+  }
+  label {
+    @apply flex flex-col gap-2 text-sm font-medium;
+  }
+  input,
+  select {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base;
+  }
+  button,
+  .button {
+    @apply inline-flex items-center justify-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-medium text-white cursor-pointer;
+  }
+  button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-600;
+  }
+  .auth-card button,
+  .auth-card .button {
+    @apply w-full;
+  }
+  .secondary {
+    @apply border border-slate-300 bg-white text-slate-800;
+  }
+  .divider {
+    @apply text-center text-xs text-slate-500;
+  }
+  .error {
+    @apply rounded-lg bg-red-50 p-3 text-sm text-red-800;
+  }
+  .actions {
+    @apply flex gap-2;
+  }
+  .access-management section {
+    @apply space-y-4 rounded-xl border border-slate-200 bg-white p-5;
+  }
+  .stats {
+    @apply grid gap-4 md:grid-cols-3;
+  }
+  .invite-form {
+    @apply flex flex-wrap items-end gap-4;
+  }
+  .invite-form label {
+    @apply grow;
+  }
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+  table {
+    @apply w-full text-left text-sm;
+  }
+  th {
+    @apply bg-slate-50 text-slate-600 font-medium;
+  }
+  td,
+  th {
+    @apply border-b border-slate-100 p-3;
+  }
+}

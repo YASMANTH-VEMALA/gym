@@ -1,0 +1,45 @@
+{
+  "name": "@gym/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "prisma generate && nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint src prisma.config.ts",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test:auth": "npm run build && node --test test/auth.test.cjs",
+    "test:integration": "npm run build && node --test test/auth.integration.test.cjs",
+    "prisma:validate": "prisma validate",
+    "db:migrate:status": "prisma migrate status",
+    "db:migrate:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@gym/types": "*",
+    "@gym/validation": "*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.0.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "class-transformer": "^0.5.0",
+    "class-validator": "^0.14.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.0",
+    "qrcode": "^1.5.4",
+    "redis": "^5.0.0",
+    "reflect-metadata": "^0.2.0",
+    "resend": "^6.0.0",
+    "rxjs": "^7.0.0",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "prisma": "^7.0.0"
+  }
+}

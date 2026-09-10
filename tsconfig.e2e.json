@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmit": true
+  },
+  "include": [
+    "playwright.config.ts",
+    "playwright.auth.config.ts",
+    "e2e/**/*.ts"
+  ]
+}

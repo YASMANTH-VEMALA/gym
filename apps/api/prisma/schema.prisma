@@ -1,0 +1,398 @@
+generator client {
+ provider = "prisma-client"
+ output = "../src/generated/prisma"
+ moduleFormat = "cjs"
+}
+datasource db {
+ provider = "postgresql"
+}
+
+enum AccessRole {
+ OWNER
+ ADMIN
+}
+
+model Business {
+ id String @id @default(uuid()) @db.Uuid
+ name String
+ currency String @default("INR")
+ timezone String @default("Asia/Kolkata")
+ ownerId String @unique @db.Uuid
+ createdAt DateTime @default(now())
+ branches Branch[]
+ access BusinessAccess[]
+ invitations Invitation[]
+ audits AuditEvent[]
+ staff Staff[]
+ membershipPlans MembershipPlan[]
+ members Member[]
+ memberCounter MemberCounter?
+ qrCredentials QrCredential[]
+ memberAccounts MemberAccountLink[]
+ memberInvitations MemberLinkInvitation[]
+ memberships Membership[]
+}
+
+model Branch {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ name String
+ code String @default(dbgenerated("('BR-'::text || upper(substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 12)))"))
+ phone String?
+ email String?
+ addressLine1 String?
+ addressLine2 String?
+ city String?
+ state String?
+ postalCode String?
+ country String?
+ timezone String?
+ status BranchStatus @default(ACTIVE)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now()) @updatedAt
+ archivedAt DateTime?
+ business Business @relation(fields: [businessId], references: [id])
+ staffAssignments StaffBranchAssignment[]
+ registeredMembers Member[] @relation("RegistrationBranch")
+ attendance Attendance[]
+ qrCredentials QrCredential[]
+ planAssignments PlanBranchAssignment[]
+ memberships Membership[]
+ @@unique([businessId, code])
+ @@unique([businessId, id])
+ @@index([businessId, status, createdAt])
+}
+
+enum BranchStatus {
+ ACTIVE
+ ARCHIVED
+}
+
+enum StaffStatus {
+ ACTIVE
+ INACTIVE
+ ARCHIVED
+}
+
+model Staff {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ fullName String
+ phone String
+ email String?
+ jobTitle String
+ gender String?
+ dateOfBirth DateTime? @db.Date
+ joiningDate DateTime @db.Date
+ address String?
+ emergencyContactName String?
+ emergencyContactPhone String?
+ status StaffStatus @default(ACTIVE)
+ notes String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now()) @updatedAt
+ archivedAt DateTime?
+ business Business @relation(fields: [businessId], references: [id])
+ branchAssignments StaffBranchAssignment[]
+ @@index([businessId, status, createdAt])
+ @@index([businessId, jobTitle])
+}
+
+model StaffBranchAssignment {
+ staffId String @db.Uuid
+ branchId String @db.Uuid
+ createdAt DateTime @default(now())
+ staff Staff @relation(fields: [staffId], references: [id])
+ branch Branch @relation(fields: [branchId], references: [id])
+ @@id([staffId, branchId])
+ @@index([branchId, staffId])
+}
+
+enum MembershipPlanStatus {
+ ACTIVE
+ INACTIVE
+ ARCHIVED
+}
+
+model MembershipPlan {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ name String
+ description String?
+ priceMinor Int
+ durationDays Int
+ appliesToAllBranches Boolean @default(true)
+ status MembershipPlanStatus @default(ACTIVE)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now()) @updatedAt
+ archivedAt DateTime?
+ business Business @relation(fields: [businessId], references: [id])
+ branchAssignments PlanBranchAssignment[]
+ memberships Membership[]
+ @@index([businessId, status, createdAt])
+}
+
+model PlanBranchAssignment {
+ planId String @db.Uuid
+ branchId String @db.Uuid
+ createdAt DateTime @default(now())
+ plan MembershipPlan @relation(fields: [planId], references: [id])
+ branch Branch @relation(fields: [branchId], references: [id])
+ @@id([planId, branchId])
+ @@index([branchId, planId])
+}
+
+enum MemberStatus {
+ ACTIVE
+ INACTIVE
+ ARCHIVED
+}
+
+model MemberCounter {
+ businessId String @id @db.Uuid
+ lastNumber Int @default(0)
+ business Business @relation(fields: [businessId], references: [id])
+}
+
+model Member {
+ id String @id @default(uuid()) @db.Uuid
+ qrCredentials QrCredential[]
+ accountLinks MemberAccountLink[]
+ accountInvitations MemberLinkInvitation[]
+ @@unique([businessId, id])
+ businessId String @db.Uuid
+ memberNumber String
+ branchId String? @db.Uuid
+ registrationBranch Branch? @relation("RegistrationBranch", fields: [businessId, branchId], references: [businessId, id])
+ attendance Attendance[]
+ @@index([businessId, branchId, status])
+ fullName String
+ phone String
+ currentPhone String?
+ alternatePhone String?
+ email String?
+ gender String?
+ dateOfBirth DateTime? @db.Date
+ occupation String?
+ addressLine1 String?
+ addressLine2 String?
+ city String?
+ state String?
+ postalCode String?
+ country String?
+ emergencyContactName String?
+ emergencyContactRelationship String?
+ emergencyContactPhone String?
+ emergencyContacts Json @default("[]")
+ profilePhoto MemberProfilePhoto?
+ heightCm Int?
+ weightGrams Int?
+ fitnessGoal String?
+ notes String?
+ joiningDate DateTime @db.Date
+ status MemberStatus @default(ACTIVE)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now()) @updatedAt
+ archivedAt DateTime?
+ business Business @relation(fields: [businessId], references: [id])
+ @@unique([businessId, memberNumber])
+ memberships Membership[]
+ @@unique([businessId, currentPhone])
+ @@index([businessId, status, createdAt])
+}
+
+model MemberProfilePhoto {
+ memberId String @id @db.Uuid
+ businessId String @db.Uuid
+ contentType String
+ data Bytes
+ updatedAt DateTime @default(now()) @updatedAt
+ member Member @relation(fields: [businessId, memberId], references: [businessId, id], onDelete: Cascade)
+ @@unique([businessId, memberId])
+}
+
+model Membership {
+ attendance Attendance[]
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ memberId String @db.Uuid
+ branchId String @db.Uuid
+ planId String @db.Uuid
+ planNameSnapshot String
+ priceMinorSnapshot Int
+ durationDaysSnapshot Int
+ startDate DateTime @db.Date
+ endDate DateTime @db.Date
+ cancelledAt DateTime?
+ cancelReason String?
+ idempotencyKey String @db.Uuid
+ createdAt DateTime @default(now())
+ business Business @relation(fields: [businessId], references: [id])
+ member Member @relation(fields: [memberId], references: [id])
+ branch Branch @relation(fields: [branchId], references: [id])
+ plan MembershipPlan @relation(fields: [planId], references: [id])
+ receivable Receivable?
+ @@unique([businessId, id])
+ @@unique([businessId, idempotencyKey])
+ @@index([businessId, branchId, startDate, endDate])
+ @@index([memberId, startDate])
+}
+
+enum PaymentMethod {
+ CASH
+ UPI
+ BANK_TRANSFER
+ CARD
+ OTHER
+}
+enum PaymentStatus {
+ RECORDED
+ VOID
+}
+model Receivable {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ membershipId String @unique @db.Uuid
+ originalAmountMinor Int
+ dueDate DateTime @db.Date
+ promiseToPayDate DateTime? @db.Date
+ voidedAt DateTime?
+ voidReason String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now()) @updatedAt
+ membership Membership @relation(fields: [businessId, membershipId], references: [businessId, id])
+ payments Payment[]
+ @@unique([businessId, membershipId])
+ @@unique([businessId, id])
+ @@index([businessId, dueDate])
+}
+model Payment {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ receivableId String @db.Uuid
+ amountMinor Int
+ method PaymentMethod
+ reference String?
+ notes String?
+ paidAt DateTime @db.Date
+ recordedByUserId String @db.Uuid
+ idempotencyKey String @db.Uuid
+ status PaymentStatus @default(RECORDED)
+ voidedAt DateTime?
+ voidReason String?
+ createdAt DateTime @default(now())
+ receivable Receivable @relation(fields: [businessId, receivableId], references: [businessId, id])
+ @@unique([businessId, idempotencyKey])
+ @@index([businessId, paidAt, status])
+ @@index([receivableId, status])
+}
+
+model BusinessAccess {
+ businessId String @db.Uuid
+ userId String @db.Uuid
+ role AccessRole
+ business Business @relation(fields: [businessId], references: [id])
+ @@id([businessId, userId])
+ @@index([userId])
+}
+
+model Invitation {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ email String
+ role AccessRole @default(ADMIN)
+ tokenHash String @unique
+ invitedBy String @db.Uuid
+ expiresAt DateTime
+ acceptedAt DateTime?
+ acceptedBy String? @db.Uuid
+ revokedAt DateTime?
+ deliveryStatus String @default("PENDING")
+ createdAt DateTime @default(now())
+ business Business @relation(fields: [businessId], references: [id])
+ @@index([businessId, createdAt])
+}
+
+model AuditEvent {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ actorId String @db.Uuid
+ action String
+ targetId String @db.Uuid
+ metadata Json?
+ createdAt DateTime @default(now())
+ business Business @relation(fields: [businessId], references: [id])
+ @@index([businessId, createdAt])
+}
+
+enum QrKind {
+ MEMBER
+ BRANCH
+}
+enum QrStatus {
+ ACTIVE
+ REVOKED
+}
+model QrCredential {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ kind QrKind
+ memberId String? @unique @db.Uuid
+ branchId String? @unique @db.Uuid
+ tokenHash String @unique
+ encryptedToken String?
+ status QrStatus @default(ACTIVE)
+ createdAt DateTime @default(now())
+ rotatedAt DateTime?
+ revokedAt DateTime?
+ business Business @relation(fields: [businessId], references: [id])
+ member Member? @relation(fields: [businessId, memberId], references: [businessId, id])
+ branch Branch? @relation(fields: [businessId, branchId], references: [businessId, id])
+ @@index([businessId, kind, status])
+}
+
+model MemberAccountLink {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ memberId String @unique @db.Uuid
+ userId String @db.Uuid
+ createdAt DateTime @default(now())
+ business Business @relation(fields: [businessId], references: [id])
+ member Member @relation(fields: [businessId, memberId], references: [businessId, id])
+ @@unique([businessId, userId])
+ @@index([userId])
+}
+model MemberLinkInvitation {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ memberId String @unique @db.Uuid
+ email String
+ tokenHash String @unique
+ invitedBy String @db.Uuid
+ expiresAt DateTime
+ acceptedAt DateTime?
+ acceptedBy String? @db.Uuid
+ revokedAt DateTime?
+ deliveryStatus String @default("PENDING")
+ createdAt DateTime @default(now())
+ business Business @relation(fields: [businessId], references: [id])
+ member Member @relation(fields: [businessId, memberId], references: [businessId, id])
+ @@index([businessId, createdAt])
+}
+
+model Attendance {
+ id String @id @default(uuid()) @db.Uuid
+ businessId String @db.Uuid
+ branchId String @db.Uuid
+ memberId String @db.Uuid
+ membershipId String @db.Uuid
+ attendanceDate DateTime @db.Date
+ checkedInAt DateTime @default(now())
+ checkedOutAt DateTime?
+ recordedByUserId String @db.Uuid
+ branch Branch @relation(fields:[businessId,branchId],references:[businessId,id], onDelete: NoAction)
+ member Member @relation(fields:[businessId,memberId],references:[businessId,id], onDelete: NoAction)
+ membership Membership @relation(fields:[businessId,membershipId],references:[businessId,id], onDelete: NoAction)
+ @@unique([businessId,branchId,memberId,attendanceDate])
+ @@index([businessId,branchId,attendanceDate])
+}
