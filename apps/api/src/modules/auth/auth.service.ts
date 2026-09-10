@@ -16,7 +16,7 @@ export interface Identity {
   token: string;
 }
 export interface AuthRequest {
-  headers: { authorization?: string };
+  headers: { authorization?: string; origin?: string };
   identity: Identity;
 }
 

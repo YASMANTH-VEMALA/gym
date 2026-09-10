@@ -15,7 +15,7 @@ export class PortalController {
  @Get('profiles/:memberId/memberships') @Header('Cache-Control','private, no-store') memberships(@Req()r:AuthRequest,@Param('memberId',ParseUUIDPipe)id:string,@Query()q:MemberPageQuery){return this.service.memberships(r.identity.userId,id,q);}
  @Get('profiles/:memberId/dues') @Header('Cache-Control','private, no-store') dues(@Req()r:AuthRequest,@Param('memberId',ParseUUIDPipe)id:string,@Query()q:MemberPageQuery){return this.service.dues(r.identity.userId,id,q);}
  @Get('profiles/:memberId/payments') @Header('Cache-Control','private, no-store') payments(@Req()r:AuthRequest,@Param('memberId',ParseUUIDPipe)id:string,@Query()q:MemberPageQuery){return this.service.payments(r.identity.userId,id,q);}
- @Get('profiles/:memberId/qr') @Header('Cache-Control','private, no-store') qr(@Req()r:AuthRequest,@Param('memberId',ParseUUIDPipe)id:string){return this.service.card(r.identity.userId,id);}
+ @Get('profiles/:memberId/qr') @Header('Cache-Control','private, no-store') qr(@Req()r:AuthRequest,@Param('memberId',ParseUUIDPipe)id:string){return this.service.card(r.identity.userId,id,r.headers.origin);}
 }
 @Controller('api/v1/businesses/:businessId/members/:memberId/account-invitation')
 @UseGuards(AuthGuard)

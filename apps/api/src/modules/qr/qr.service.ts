@@ -20,6 +20,34 @@ import { QrGenerateDto, QrQuery } from './qr.dto';
 import { AttendanceService } from '../attendance/attendance.service';
 export const hashQr = (token: string) =>
   createHash('sha256').update(token).digest('hex');
+
+export function resolveQrWebOrigin(
+  configuredOrigin?: string,
+  requestOrigin?: string,
+): string {
+  const candidate = requestOrigin?.trim() || configuredOrigin?.trim();
+  if (!candidate) return 'http://localhost:3000';
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new ServiceUnavailableException(
+      'A valid public web origin is required',
+    );
+  }
+  if (
+    url.protocol !== 'https:' &&
+    !(
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1'].includes(url.hostname)
+    )
+  )
+    throw new ServiceUnavailableException(
+      'A secure public web origin is required',
+    );
+  return url.origin;
+}
+
 @Injectable()
 export class QrService {
   constructor(
@@ -213,22 +241,14 @@ export class QrService {
       return { created: missing.length };
     });
   }
-  async image(qr: QrCredential) {
+  async image(qr: QrCredential, requestOrigin?: string) {
     if (qr.status !== 'ACTIVE')
       throw new ConflictException('This QR credential is revoked');
-    const origin =
-      this.config.get<string>('WEB_ORIGIN') || 'http://localhost:3000';
+    const origin = resolveQrWebOrigin(
+      this.config.get<string>('WEB_ORIGIN'),
+      requestOrigin,
+    );
     const url = new URL(qr.kind === 'BRANCH' ? '/join' : '/q/member', origin);
-    if (
-      url.protocol !== 'https:' &&
-      !(
-        url.protocol === 'http:' &&
-        ['localhost', '127.0.0.1'].includes(url.hostname)
-      )
-    )
-      throw new ServiceUnavailableException(
-        'A secure public web origin is required',
-      );
     url.hash = `token=${this.decrypt(qr)}`;
     const dataUrl = await toDataURL(url.href, {
       errorCorrectionLevel: 'M',
@@ -237,7 +257,12 @@ export class QrService {
     });
     return { ...this.metadata(qr), dataUrl, url: url.href };
   }
-  async view(userId: string, businessId: string, id: string) {
+  async view(
+    userId: string,
+    businessId: string,
+    id: string,
+    requestOrigin?: string,
+  ) {
     await this.scope.access(userId, businessId);
     const qr = await this.scope.database.db.qrCredential.findFirst({
       where: { id, businessId },
@@ -250,7 +275,7 @@ export class QrService {
       throw new NotFoundException('QR credential not found in this business');
     if ((qr.member?.status || qr.branch?.status) !== 'ACTIVE')
       throw new ConflictException('The QR target is not active');
-    return this.image(qr);
+    return this.image(qr, requestOrigin);
   }
   revoke(userId: string, businessId: string, id: string) {
     return this.scope.write(userId, businessId, async (tx) => {

@@ -42,7 +42,7 @@ export class QrController {
     @Param('businessId', ParseUUIDPipe) b: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.service.view(r.identity.userId, b, id);
+    return this.service.view(r.identity.userId, b, id, r.headers.origin);
   }
   @Post(':id/revoke') revoke(
     @Req() r: AuthRequest,

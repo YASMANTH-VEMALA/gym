@@ -286,7 +286,7 @@ export class PortalService {
     ]);
     return wire({ total, items, page: q.page, pageSize: q.pageSize });
   }
-  async card(userId: string, memberId: string) {
+  async card(userId: string, memberId: string, requestOrigin?: string) {
     const link = await this.access(userId, memberId);
     const credential = await this.scope.database.db.qrCredential.findFirst({
       where: {
@@ -297,6 +297,6 @@ export class PortalService {
         member: { status: 'ACTIVE' },
       },
     });
-    return credential ? this.qr.image(credential) : null;
+    return credential ? this.qr.image(credential, requestOrigin) : null;
   }
 }
