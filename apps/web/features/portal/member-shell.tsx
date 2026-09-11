@@ -5,33 +5,47 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Home, IdCard, Wallet, QrCode, User } from 'lucide-react';
 import { browserAuth } from '@/lib/supabase/client';
+import { resolveLogoUrl } from '@/lib/api/auth-api';
 import { MemberProvider, useMemberContext } from './member-context';
 function Shell({ children }: { children: ReactNode }) {
   const cache = useQueryClient();
   const { current, links, href } = useMemberContext(),
     pathname = usePathname(),
     router = useRouter();
+  const logoUrl = resolveLogoUrl(current.business.logoUrl);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const nav = [
     ['/member', 'Home', Home],
     ['/member/membership', 'Membership', IdCard],
-    ['/member/payments', 'Payments', Wallet],
+    ['/member/dues', 'Dues & Payments', Wallet],
     ['/member/qr', 'QR', QrCode],
     ['/member/profile', 'Profile', User],
   ] as const;
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-5 py-5">
-          <div>
-            <Link
-              href={href('/member')}
-              className="text-xs font-bold tracking-widest text-blue-700"
-            >
-              GYM / MEMBER
-            </Link>
-            <p className="mt-1 font-semibold">{current.business.name}</p>
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center gap-3">
+            {logoUrl ? (
+              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-0.5 shadow-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : null}
+            <div>
+              <Link
+                href={href('/member')}
+                className="text-xs font-bold tracking-widest text-blue-700 uppercase"
+              >
+                Member Portal
+              </Link>
+              <p className="mt-0.5 font-bold text-slate-900">{current.business.name}</p>
+            </div>
           </div>
           <button
             disabled={busy}

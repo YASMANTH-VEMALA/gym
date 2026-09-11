@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter,useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api/auth-api';
 import { Panel,LoadState } from '@/features/product/ui';
-export interface MemberLink {memberId:string;businessId:string;member:{fullName:string;memberNumber:string;status:string};business:{name:string;currency:string;timezone:string}}
+export interface MemberLink {memberId:string;businessId:string;member:{fullName:string;memberNumber:string;status:string};business:{name:string;currency:string;timezone:string;logoUrl?:string|null}}
 const Context=createContext<{current:MemberLink;links:MemberLink[];href:(path:string)=>string}|null>(null);
 export function MemberProvider({children}:{children:ReactNode}){
  const params=useSearchParams(),router=useRouter();const query=useQuery({queryKey:['member-links'],queryFn:()=>api<MemberLink[]>('/member/links'),retry:false});const requested=params.get('memberId');const current=requested?query.data?.find(l=>l.memberId===requested):query.data?.[0];

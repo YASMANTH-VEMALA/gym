@@ -47,6 +47,7 @@ export function useFragmentCredential(storage: string) {
 }
 export async function resolvePublicBranch(token: string): Promise<{
   businessName: string;
+  businessLogoUrl?: string | null;
   branchName: string;
   joiningDate: string;
 }> {

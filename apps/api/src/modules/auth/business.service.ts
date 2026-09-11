@@ -8,7 +8,12 @@ import {
 import { DatabaseService } from '../../database/database.service';
 import { MailService } from '../../integrations/resend/mail.service';
 import { AuthService, type Identity } from './auth.service';
-import { OnboardingDto } from './auth.dto';
+import {
+  OnboardingDto,
+  UpdateBusinessProfileDto,
+  InviteDto,
+  UpdateAccessDto,
+} from './auth.dto';
 import { hashToken, newInvitationToken } from './invitation-token';
 import type { Prisma } from '../../generated/prisma/client';
 
@@ -17,11 +22,16 @@ const invitationView = {
   businessId: true,
   email: true,
   role: true,
+  assignedBranchId: true,
+  permissions: true,
   expiresAt: true,
   acceptedAt: true,
   revokedAt: true,
   deliveryStatus: true,
   createdAt: true,
+  assignedBranch: {
+    select: { id: true, name: true },
+  },
 } as const;
 
 @Injectable()
@@ -31,8 +41,8 @@ export class BusinessService {
     private readonly auth: AuthService,
     private readonly mail: MailService,
   ) {}
-  access(identity: Identity) {
-    return this.database.db.businessAccess.findMany({
+  async access(identity: Identity) {
+    const list = await this.database.db.businessAccess.findMany({
       where: { userId: identity.userId },
       include: {
         business: {
@@ -43,7 +53,24 @@ export class BusinessService {
             },
           },
         },
+        assignedBranch: {
+          select: { id: true, name: true, status: true },
+        },
       },
+    });
+    return list.map((item) => {
+      if (item.assignedBranchId && item.role === 'MANAGER') {
+        return {
+          ...item,
+          business: {
+            ...item.business,
+            branches: item.business.branches.filter(
+              (b) => b.id === item.assignedBranchId,
+            ),
+          },
+        };
+      }
+      return item;
     });
   }
   async onboard(identity: Identity, input: OnboardingDto) {
@@ -114,6 +141,9 @@ export class BusinessService {
     await this.owner(this.database.db, businessId, identity.userId);
     const access = await this.database.db.businessAccess.findMany({
       where: { businessId },
+      include: {
+        assignedBranch: { select: { id: true, name: true } },
+      },
       orderBy: [{ role: 'desc' }, { userId: 'asc' }],
     });
     const invitations = await this.database.db.invitation.findMany({
@@ -122,9 +152,66 @@ export class BusinessService {
       select: { acceptedBy: true, email: true },
     });
     return access.map((a) => ({
-      ...a,
+      userId: a.userId,
+      role: a.role,
+      assignedBranchId: a.assignedBranchId,
+      assignedBranchName: a.assignedBranch?.name || null,
+      permissions: (a.permissions as string[]) || [],
       email: invitations.find((i) => i.acceptedBy === a.userId)?.email || null,
     }));
+  }
+
+  async updateAccess(
+    identity: Identity,
+    businessId: string,
+    userId: string,
+    input: UpdateAccessDto,
+  ) {
+    return this.database.db.$transaction(async (tx) => {
+      await this.owner(tx, businessId, identity.userId);
+      const target = await tx.businessAccess.findUnique({
+        where: { businessId_userId: { businessId, userId } },
+      });
+      if (!target) throw new NotFoundException('Team member not found');
+      if (target.role === 'OWNER') {
+        throw new ForbiddenException('The Owner access cannot be modified.');
+      }
+      if (input.assignedBranchId) {
+        const branch = await tx.branch.findFirst({
+          where: { id: input.assignedBranchId, businessId, status: 'ACTIVE' },
+        });
+        if (!branch) throw new BadRequestException('Invalid branch selected');
+      }
+      const updated = await tx.businessAccess.update({
+        where: { businessId_userId: { businessId, userId } },
+        data: {
+          ...(input.role ? { role: input.role } : {}),
+          assignedBranchId:
+            input.assignedBranchId !== undefined
+              ? input.assignedBranchId
+              : undefined,
+          permissions:
+            input.permissions !== undefined ? input.permissions : undefined,
+        },
+        include: {
+          assignedBranch: { select: { id: true, name: true } },
+        },
+      });
+      await this.audit(
+        tx,
+        businessId,
+        identity.userId,
+        'TEAM_ACCESS_UPDATED',
+        userId,
+      );
+      return {
+        userId: updated.userId,
+        role: updated.role,
+        assignedBranchId: updated.assignedBranchId,
+        assignedBranchName: updated.assignedBranch?.name || null,
+        permissions: (updated.permissions as string[]) || [],
+      };
+    });
   }
   async removeAdmin(identity: Identity, businessId: string, userId: string) {
     return this.database.db.$transaction(async (tx) => {
@@ -149,6 +236,117 @@ export class BusinessService {
       return { removed: true };
     });
   }
+
+  private parseLogo(value: string | null | undefined) {
+    if (value === undefined || value === null) return value;
+    const match =
+      /^data:(image\/(?:jpeg|png|webp|svg\+xml));base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+        value,
+      );
+    if (!match)
+      throw new BadRequestException(
+        'Logo must be a JPEG, PNG, WebP, or SVG data URL.',
+      );
+    const data = Buffer.from(match[2]!, 'base64');
+    if (!data.length || data.length > 2097152)
+      throw new BadRequestException(
+        'Logo must be between 1 byte and 2 MB.',
+      );
+    const type = match[1]!;
+    const valid =
+      (type === 'image/jpeg' &&
+        data[0] === 0xff &&
+        data[1] === 0xd8 &&
+        data[2] === 0xff) ||
+      (type === 'image/png' &&
+        data
+          .subarray(0, 8)
+          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+      (type === 'image/webp' &&
+        data.subarray(0, 4).toString() === 'RIFF' &&
+        data.subarray(8, 12).toString() === 'WEBP') ||
+      (type === 'image/svg+xml' &&
+        (data.toString('utf8').includes('<svg') ||
+          data.toString('utf8').includes('<?xml')));
+    if (!valid)
+      throw new BadRequestException(
+        'Logo content does not match its image type.',
+      );
+    return { contentType: type, data, byteLength: data.length };
+  }
+
+  async updateProfile(
+    identity: Identity,
+    businessId: string,
+    input: UpdateBusinessProfileDto,
+  ) {
+    if (input.timezone) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: input.timezone });
+      } catch {
+        throw new BadRequestException('Choose a valid timezone');
+      }
+    }
+    return this.database.db.$transaction(async (tx) => {
+      await this.owner(tx, businessId, identity.userId);
+
+      let logoUrlUpdate: string | null | undefined = undefined;
+
+      if (
+        input.logoDataUrl === null ||
+        (input.logoUrl === null && input.logoDataUrl === undefined)
+      ) {
+        await tx.businessLogo.deleteMany({ where: { businessId } });
+        logoUrlUpdate = null;
+      } else if (input.logoDataUrl) {
+        const logo = this.parseLogo(input.logoDataUrl);
+        if (logo) {
+          await tx.businessLogo.upsert({
+            where: { businessId },
+            create: { businessId, ...logo },
+            update: logo,
+          });
+          logoUrlUpdate = `/api/v1/businesses/${businessId}/logo`;
+        }
+      } else if (input.logoUrl) {
+        logoUrlUpdate = input.logoUrl;
+      }
+
+      const updated = await tx.business.update({
+        where: { id: businessId },
+        data: {
+          ...(input.name ? { name: input.name } : {}),
+          ...(input.currency ? { currency: input.currency } : {}),
+          ...(input.timezone ? { timezone: input.timezone } : {}),
+          ...(logoUrlUpdate !== undefined ? { logoUrl: logoUrlUpdate } : {}),
+        },
+        include: {
+          branches: {
+            select: { id: true, name: true, status: true },
+            orderBy: { name: 'asc' },
+          },
+        },
+      });
+
+      await this.audit(
+        tx,
+        businessId,
+        identity.userId,
+        'BUSINESS_PROFILE_UPDATED',
+        businessId,
+      );
+
+      return updated;
+    });
+  }
+
+  async getLogo(businessId: string) {
+    return this.database.db.businessLogo.findUnique({
+      where: { businessId },
+      select: { contentType: true, data: true, updatedAt: true },
+    });
+  }
+
   async invitations(identity: Identity, businessId: string) {
     await this.owner(this.database.db, businessId, identity.userId);
     return this.database.db.invitation.findMany({
@@ -158,10 +356,30 @@ export class BusinessService {
       take: 100,
     });
   }
-  async invite(identity: Identity, businessId: string, email: string) {
+  async invite(
+    identity: Identity,
+    businessId: string,
+    input: InviteDto | string,
+  ) {
+    const email = (typeof input === 'string' ? input : input.email)
+      .trim()
+      .toLowerCase();
+    const role =
+      typeof input === 'object' && input.role ? input.role : 'ADMIN';
+    const assignedBranchId =
+      typeof input === 'object' ? input.assignedBranchId || null : null;
+    const permissions =
+      typeof input === 'object' && input.permissions ? input.permissions : null;
+
     const { token, tokenHash } = newInvitationToken();
     const invitation = await this.database.db.$transaction(async (tx) => {
       await this.owner(tx, businessId, identity.userId);
+      if (assignedBranchId) {
+        const branch = await tx.branch.findFirst({
+          where: { id: assignedBranchId, businessId, status: 'ACTIVE' },
+        });
+        if (!branch) throw new BadRequestException('Invalid branch selected');
+      }
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${businessId + email}))`;
       const pending = await tx.invitation.findFirst({
         where: { businessId, email, acceptedAt: null, revokedAt: null },
@@ -174,6 +392,9 @@ export class BusinessService {
         data: {
           businessId,
           email,
+          role,
+          assignedBranchId,
+          permissions: permissions ? permissions : undefined,
           tokenHash,
           invitedBy: identity.userId,
           expiresAt: new Date(Date.now() + 7 * 86400000),
@@ -303,9 +524,15 @@ export class BusinessService {
         create: {
           businessId: invitation.businessId,
           userId: identity.userId,
-          role: 'ADMIN',
+          role: invitation.role,
+          assignedBranchId: invitation.assignedBranchId,
+          permissions: invitation.permissions ?? undefined,
         },
-        update: {},
+        update: {
+          role: invitation.role,
+          assignedBranchId: invitation.assignedBranchId,
+          permissions: invitation.permissions ?? undefined,
+        },
       });
       await tx.invitation.update({
         where: { id: invitation.id },
@@ -319,6 +546,42 @@ export class BusinessService {
         invitation.id,
       );
       return { businessId: invitation.businessId };
+    });
+  }
+
+  async getGoogleSheetsConfig(userId: string, businessId: string) {
+    const access = await this.database.db.businessAccess.findUnique({
+      where: { businessId_userId: { businessId, userId } },
+    });
+    if (!access) throw new ForbiddenException('No access to business');
+    const business = await this.database.db.business.findUnique({
+      where: { id: businessId },
+      select: { googleSheetId: true, googleSyncSettings: true },
+    });
+    const hasEnvConfig = !!(
+      process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    );
+    return {
+      hasEnvConfig,
+      sheetId: business?.googleSheetId || null,
+      syncSettings: business?.googleSyncSettings || null,
+    };
+  }
+
+  async updateGoogleSheetsConfig(
+    identity: Identity,
+    businessId: string,
+    input: { sheetId?: string | null; syncSettings?: unknown },
+  ) {
+    return this.database.db.$transaction(async (tx) => {
+      await this.owner(tx, businessId, identity.userId);
+      return tx.business.update({
+        where: { id: businessId },
+        data: {
+          googleSheetId: input.sheetId,
+          googleSyncSettings: input.syncSettings as Prisma.InputJsonValue,
+        },
+      });
     });
   }
 }

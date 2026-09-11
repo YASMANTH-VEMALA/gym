@@ -313,7 +313,7 @@ export class QrService {
       },
       include: {
         branch: { select: { id: true, name: true, timezone: true } },
-        business: { select: { id: true, name: true, timezone: true } },
+        business: { select: { id: true, name: true, timezone: true, logoUrl: true } },
       },
     });
     if (!qr)
@@ -326,6 +326,7 @@ export class QrService {
     const qr = await this.branchToken(token);
     return {
       businessName: qr.business.name,
+      businessLogoUrl: qr.business.logoUrl || null,
       branchName: qr.branch!.name,
       joiningDate: calendarToday(qr.branch!.timezone || qr.business.timezone),
     };

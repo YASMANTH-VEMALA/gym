@@ -10,7 +10,10 @@ const { NestFactory } = require('@nestjs/core');
 const { Module, ValidationPipe } = require('@nestjs/common');
 const { ConfigService } = require('@nestjs/config');
 const { AuthService, AuthGuard } = require('../dist/modules/auth/auth.service');
-const { AuthController } = require('../dist/modules/auth/auth.controller');
+const {
+  AuthController,
+  BusinessLogoController,
+} = require('../dist/modules/auth/auth.controller');
 const {
   BranchesController,
 } = require('../dist/modules/branches/branches.controller');
@@ -460,6 +463,7 @@ test(
       controllers: [
         AttendanceController,
         AuthController,
+        BusinessLogoController,
         DashboardController,
         BranchesController,
         StaffController,

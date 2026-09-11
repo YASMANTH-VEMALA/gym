@@ -76,7 +76,7 @@ function PaymentForm({ due, close }: { due: Due; close: () => void }) {
   const [review, setReview] = useState<number | null>(null);
   const money = (n: number) => formatMoneyMinor(n, due.currency);
   return (
-    <Panel title="3. Confirm cash payment">
+    <Panel title="Confirm payment">
       <p>
         {due.fullName} · {due.planNameSnapshot} · {due.branchName}
       </p>
@@ -319,7 +319,8 @@ export function FinancePanel({
   memberId?: string;
   membershipId?: string;
 }) {
-  const { current, branchId, href } = useAdminContext();
+  const { current, branchId, isBranchLocked, assignedBranchName, href } =
+    useAdminContext();
   const [status, setStatus] = useState('ALL');
   const [search, setSearch] = useState('');
   const [dueFrom, setFrom] = useState('');
@@ -335,6 +336,7 @@ export function FinancePanel({
   const today = calendarToday(current!.business.timezone);
   const [paymentMonth, setPaymentMonth] = useState(today.slice(0, 7));
   const [selected, setSelected] = useState<Due | null>(null);
+  const [view, setView] = useState<'collect' | 'dues' | 'history'>('collect');
   const collectionMemberId =
     collectionSelection.branchId === branchId
       ? collectionSelection.memberId
@@ -392,146 +394,191 @@ export function FinancePanel({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl">Payments &amp; dues</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Balances reflect recorded payments. Promise dates guide follow-up and
-          keep the original due date intact.
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+          Payments
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Collect a payment, follow up on balances, or review past transactions.
         </p>
       </header>
-      <Panel title="1. Choose the person who is paying">
-        <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-          Branch: <strong>{selectedBranchName || 'All Branches'}</strong>. To
-          change it, use the branch selector at the top-right.
-        </p>
-        <label className="block max-w-md">
-          Search name, phone, or member ID
-          <input
-            autoFocus
-            value={peopleSearch}
-            onChange={(event) => setPeopleSearch(event.target.value)}
-            placeholder="Start typing the member's name"
-            maxLength={120}
-          />
-        </label>
-        <LoadState
-          pending={collectionMembers.isPending}
-          error={collectionMembers.error}
-          retry={collectionMembers.refetch}
-        />
-        {collectionMembers.data &&
-          (collectionMembers.data.items.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="border border-slate-200 p-3">Person</th>
-                    <th className="border border-slate-200 p-3">Member ID</th>
-                    <th className="border border-slate-200 p-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {collectionMembers.data.items.map((person) => {
-                    const chosen = collectionMemberId === person.id;
-                    return (
-                      <tr
-                        key={person.id}
-                        className={chosen ? 'bg-blue-50' : undefined}
-                      >
-                        <td className="border border-slate-200 p-3 font-medium">
-                          {person.fullName}
-                        </td>
-                        <td className="border border-slate-200 p-3">
-                          {person.memberNumber}
-                        </td>
-                        <td className="border border-slate-200 p-3">
-                          <button
-                            aria-pressed={chosen}
-                            onClick={() => {
-                              setCollectionSelection({
-                                branchId,
-                                memberId: person.id,
-                              });
-                              setSelected(null);
-                            }}
-                          >
-                            {chosen ? 'Selected' : 'Choose person'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p>No active people found in this branch.</p>
-          ))}
-        {collectionMemberId && (
-          <div className="border-t border-slate-200 pt-4">
-            <h3 className="font-semibold">2. Choose what they are paying</h3>
-            <LoadState
-              pending={collectionDues.isPending}
-              error={collectionDues.error}
-              retry={collectionDues.refetch}
-            />
-          </div>
-        )}
-        {collectionMemberId && collectionDues.data && (
-          <>
-            {!collectionDues.data.items.length ? (
-              <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
-                <p>
-                  This member has no unpaid membership in the selected branch.
-                </p>
-                <Link
-                  className="mt-3 inline-flex text-blue-700"
-                  href={`${newMembershipHref}${newMembershipHref.includes('?') ? '&' : '?'}memberId=${collectionMemberId}`}
-                >
-                  Assign a membership first
-                </Link>
-              </div>
+      <nav
+        aria-label="Payment views"
+        className="flex gap-1 border-b border-slate-200"
+      >
+        {(
+          [
+            ['collect', 'Collect payment'],
+            ['dues', 'Outstanding dues'],
+            ['history', 'Payment history'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setView(key)}
+            aria-current={view === key ? 'page' : undefined}
+            className={`rounded-none border-b-2 bg-transparent px-4 py-2.5 text-sm shadow-none ${
+              view === key
+                ? 'border-slate-950 font-semibold text-slate-950'
+                : 'border-transparent font-medium text-slate-500 hover:bg-transparent hover:text-slate-900'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {view === 'collect' && (
+        <>
+          <Panel title="Choose a member">
+            {isBranchLocked ? (
+              <p className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900 flex items-center gap-2">
+                <span>
+                  Branch:{' '}
+                  <strong>{assignedBranchName || selectedBranchName}</strong>.
+                  Payments are limited to this branch.
+                </span>
+              </p>
             ) : (
-              <div className="space-y-3">
-                {collectionDues.data.items.map((due) => (
-                  <div
-                    key={due.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {due.fullName} · {due.planNameSnapshot}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        {due.branchName} · Outstanding{' '}
-                        {formatMoneyMinor(due.outstandingMinor, due.currency)}
-                      </p>
-                    </div>
-                    <button onClick={() => setSelected(due)}>
-                      Collect cash
-                    </button>
-                  </div>
-                ))}
+              <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+                Branch: <strong>{selectedBranchName || 'All Branches'}</strong>.
+                To change it, use the branch selector at the top-right.
+              </p>
+            )}
+            <label className="block max-w-md">
+              Search name, phone, or member ID
+              <input
+                autoFocus
+                value={peopleSearch}
+                onChange={(event) => setPeopleSearch(event.target.value)}
+                placeholder="Start typing the member's name"
+                maxLength={120}
+              />
+            </label>
+            <LoadState
+              pending={collectionMembers.isPending}
+              error={collectionMembers.error}
+              retry={collectionMembers.refetch}
+            />
+            {collectionMembers.data &&
+              (collectionMembers.data.items.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="border border-slate-200 p-3">Person</th>
+                        <th className="border border-slate-200 p-3">
+                          Member ID
+                        </th>
+                        <th className="border border-slate-200 p-3">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {collectionMembers.data.items.map((person) => {
+                        const chosen = collectionMemberId === person.id;
+                        return (
+                          <tr
+                            key={person.id}
+                            className={chosen ? 'bg-blue-50' : undefined}
+                          >
+                            <td className="border border-slate-200 p-3 font-medium">
+                              {person.fullName}
+                            </td>
+                            <td className="border border-slate-200 p-3">
+                              {person.memberNumber}
+                            </td>
+                            <td className="border border-slate-200 p-3">
+                              <button
+                                aria-pressed={chosen}
+                                onClick={() => {
+                                  setCollectionSelection({
+                                    branchId,
+                                    memberId: person.id,
+                                  });
+                                  setSelected(null);
+                                }}
+                              >
+                                {chosen ? 'Selected' : 'Choose person'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>No active people found in this branch.</p>
+              ))}
+            {collectionMemberId && (
+              <div className="border-t border-slate-200 pt-4">
+                <h3 className="font-semibold">Choose a balance</h3>
+                <LoadState
+                  pending={collectionDues.isPending}
+                  error={collectionDues.error}
+                  retry={collectionDues.refetch}
+                />
               </div>
             )}
-          </>
-        )}
-      </Panel>
-      {visibleSelected && (
-        <PaymentForm
-          key={visibleSelected.id}
-          due={visibleSelected}
-          close={() => setSelected(null)}
-        />
+            {collectionMemberId && collectionDues.data && (
+              <>
+                {!collectionDues.data.items.length ? (
+                  <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+                    <p>
+                      This member has no unpaid membership in the selected
+                      branch.
+                    </p>
+                    <Link
+                      className="mt-3 inline-flex text-blue-700"
+                      href={`${newMembershipHref}${newMembershipHref.includes('?') ? '&' : '?'}memberId=${collectionMemberId}`}
+                    >
+                      Assign a membership first
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {collectionDues.data.items.map((due) => (
+                      <div
+                        key={due.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {due.fullName} · {due.planNameSnapshot}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {due.branchName} · Outstanding{' '}
+                            {formatMoneyMinor(
+                              due.outstandingMinor,
+                              due.currency,
+                            )}
+                          </p>
+                        </div>
+                        <button onClick={() => setSelected(due)}>
+                          Collect cash
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </Panel>
+          {visibleSelected && (
+            <PaymentForm
+              key={visibleSelected.id}
+              due={visibleSelected}
+              close={() => setSelected(null)}
+            />
+          )}
+        </>
       )}
-      <details className="rounded-xl border border-slate-200 bg-white p-5">
-        <summary className="cursor-pointer font-semibold">
-          View full payment register and advanced filters
-        </summary>
-        <div className="mt-5 space-y-5">
-          <Panel title="Member payment register">
+
+      {view === 'dues' && (
+        <div className="space-y-5">
+          <Panel title="Dues register">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <p className="text-sm text-slate-500">
-                Spreadsheet view of membership fees and payment status for{' '}
+                Membership fees and payment status for{' '}
                 {selectedBranchName || 'all branches'}.
               </p>
               <Link className="button" href={href('/admin/reports')}>
@@ -638,7 +685,7 @@ export function FinancePanel({
                 Totals use the selected dues filters. This week is Monday to
                 Sunday in {current?.business.timezone}.
               </p>
-              <Panel title="Payment spreadsheet">
+              <Panel title="Member balances">
                 {!dues.data.items.length ? (
                   <p>No member payment records match this branch and filter.</p>
                 ) : (
@@ -751,87 +798,94 @@ export function FinancePanel({
             </>
           )}
         </div>
-      </details>
-      <Panel title="Monthly cash ledger">
-        <p className="text-sm text-slate-500">
-          Manual collections for the selected month and branch. Choose All
-          Branches above for the owner-wide view. Voided entries remain in the
-          audit history but are excluded from totals.
-        </p>
-        <label className="mt-3 block max-w-xs">
-          Collection month
-          <input
-            type="month"
-            max={today.slice(0, 7)}
-            value={paymentMonth}
-            onChange={(event) => {
-              if (!event.target.value) return;
-              setPaymentMonth(event.target.value);
-              setHistoryPage(1);
-            }}
-          />
-        </label>
-        <LoadState
-          pending={payments.isPending}
-          error={payments.error}
-          retry={payments.refetch}
-        />
-        {payments.data && (
-          <>
-            <div className="my-4 grid gap-3 sm:grid-cols-2">
-              <Panel title="Cash collected">
-                <p className="text-xl font-semibold">
-                  {formatMoneyMinor(
-                    payments.data.metrics.collectedMinor,
-                    currency,
-                  )}
-                </p>
-              </Panel>
-              <Panel title="Payments recorded">
-                <p className="text-xl font-semibold">
-                  {payments.data.metrics.paymentCount}
-                </p>
-              </Panel>
-            </div>
-            {!branchId && payments.data.branches.length > 0 && (
-              <div className="mb-4 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-200">
-                    <tr>
-                      <th className="p-3">Branch</th>
-                      <th className="p-3">Cash collected</th>
-                      <th className="p-3">Payments</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {payments.data.branches.map((branch) => (
-                      <tr key={branch.branchId}>
-                        <td className="p-3">{branch.branchName}</td>
-                        <td className="p-3">
-                          {formatMoneyMinor(branch.collectedMinor, currency)}
-                        </td>
-                        <td className="p-3">{branch.paymentCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {!payments.data.items.length && <p>No payments recorded yet.</p>}
-            <ul className="divide-y divide-slate-100">
-              {payments.data.items.map((p) => (
-                <PaymentHistoryRow key={p.id} payment={p} currency={currency} />
-              ))}
-            </ul>
-            <Pager
-              page={historyPage}
-              total={payments.data.total}
-              size={payments.data.pageSize}
-              onPage={setHistoryPage}
+      )}
+
+      {view === 'history' && (
+        <Panel title="Monthly cash ledger">
+          <p className="text-sm text-slate-500">
+            Manual collections for the selected month and branch. Choose All
+            Branches above for the owner-wide view. Voided entries remain in the
+            audit history but are excluded from totals.
+          </p>
+          <label className="mt-3 block max-w-xs">
+            Collection month
+            <input
+              type="month"
+              max={today.slice(0, 7)}
+              value={paymentMonth}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                setPaymentMonth(event.target.value);
+                setHistoryPage(1);
+              }}
             />
-          </>
-        )}
-      </Panel>
+          </label>
+          <LoadState
+            pending={payments.isPending}
+            error={payments.error}
+            retry={payments.refetch}
+          />
+          {payments.data && (
+            <>
+              <div className="my-4 grid gap-3 sm:grid-cols-2">
+                <Panel title="Cash collected">
+                  <p className="text-xl font-semibold">
+                    {formatMoneyMinor(
+                      payments.data.metrics.collectedMinor,
+                      currency,
+                    )}
+                  </p>
+                </Panel>
+                <Panel title="Payments recorded">
+                  <p className="text-xl font-semibold">
+                    {payments.data.metrics.paymentCount}
+                  </p>
+                </Panel>
+              </div>
+              {!branchId && payments.data.branches.length > 0 && (
+                <div className="mb-4 overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-slate-200">
+                      <tr>
+                        <th className="p-3">Branch</th>
+                        <th className="p-3">Cash collected</th>
+                        <th className="p-3">Payments</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments.data.branches.map((branch) => (
+                        <tr key={branch.branchId}>
+                          <td className="p-3">{branch.branchName}</td>
+                          <td className="p-3">
+                            {formatMoneyMinor(branch.collectedMinor, currency)}
+                          </td>
+                          <td className="p-3">{branch.paymentCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!payments.data.items.length && <p>No payments recorded yet.</p>}
+              <ul className="divide-y divide-slate-100">
+                {payments.data.items.map((p) => (
+                  <PaymentHistoryRow
+                    key={p.id}
+                    payment={p}
+                    currency={currency}
+                  />
+                ))}
+              </ul>
+              <Pager
+                page={historyPage}
+                total={payments.data.total}
+                size={payments.data.pageSize}
+                onPage={setHistoryPage}
+              />
+            </>
+          )}
+        </Panel>
+      )}
     </div>
   );
 }

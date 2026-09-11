@@ -27,7 +27,8 @@ export function wire<T>(value: T): T {
 @Injectable()
 export class BusinessScope {
   constructor(readonly database: DatabaseService) {}
-  async access(
+
+  async getAccessRecord(
     userId: string,
     businessId: string,
     tx: Prisma.TransactionClient = this.database.db,
@@ -36,10 +37,64 @@ export class BusinessScope {
       where: { businessId_userId: { businessId, userId } },
       include: { business: true },
     });
-    if (!access || !['OWNER', 'ADMIN'].includes(access.role))
+    if (!access || !['OWNER', 'ADMIN', 'MANAGER'].includes(access.role))
       throw new ForbiddenException('You do not have access to this business');
+    return access;
+  }
+
+  async access(
+    userId: string,
+    businessId: string,
+    tx: Prisma.TransactionClient = this.database.db,
+  ) {
+    const access = await this.getAccessRecord(userId, businessId, tx);
     return access.business;
   }
+
+  async checkAccess(
+    userId: string,
+    businessId: string,
+    requiredSection?: string,
+    requestedBranchId?: string,
+    tx: Prisma.TransactionClient = this.database.db,
+  ) {
+    const access = await this.getAccessRecord(userId, businessId, tx);
+
+    // 1. Check section permission for managers
+    if (requiredSection && access.role === 'MANAGER' && access.permissions) {
+      const perms = Array.isArray(access.permissions)
+        ? (access.permissions as string[])
+        : [];
+      if (!perms.includes(requiredSection)) {
+        throw new ForbiddenException(
+          `You do not have permission to access ${requiredSection}`,
+        );
+      }
+    }
+
+    // 2. Check branch scoping
+    let effectiveBranchId = requestedBranchId;
+    if (access.assignedBranchId) {
+      if (
+        requestedBranchId &&
+        requestedBranchId !== access.assignedBranchId
+      ) {
+        throw new ForbiddenException(
+          'You only have access to your assigned branch',
+        );
+      }
+      effectiveBranchId = access.assignedBranchId;
+    } else if (requestedBranchId) {
+      await this.branch(businessId, requestedBranchId);
+    }
+
+    return {
+      business: access.business,
+      access,
+      effectiveBranchId,
+    };
+  }
+
   async branch(businessId: string, branchId?: string) {
     if (
       branchId &&
@@ -49,6 +104,7 @@ export class BusinessScope {
     )
       throw new ForbiddenException('Branch does not belong to this business');
   }
+
   async write<T>(
     userId: string,
     businessId: string,
@@ -63,6 +119,7 @@ export class BusinessScope {
       { timeout: 15000 },
     );
   }
+
   audit(
     tx: Prisma.TransactionClient,
     businessId: string,

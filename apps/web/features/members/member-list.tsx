@@ -16,7 +16,7 @@ import {
   memberDate,
 } from './member-shared';
 export function MemberListView() {
-  const { current, branchId, href } = useAdminContext();
+  const { current, branchId, isBranchLocked, assignedBranchName, href } = useAdminContext();
   const params = useSearchParams();
   const router = useRouter();
   const [changing, startTransition] = useTransition();
@@ -57,12 +57,17 @@ export function MemberListView() {
           Add Member
         </Link>
       </MemberHeader>
-      {branchId && (
+      {isBranchLocked ? (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900 flex items-center gap-2">
+          <span>🔒</span>
+          <span>Branch Manager Scope: Showing members exclusively for <strong>{assignedBranchName}</strong>.</span>
+        </div>
+      ) : branchId ? (
         <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
           Showing members registered at the selected branch. Choose All branches
           to find unassigned members.
         </p>
-      )}
+      ) : null}
       <Card className="p-4">
         <form
           key={`${search}:${status}`}

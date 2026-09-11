@@ -23,7 +23,7 @@ import {
 } from './member-shared';
 
 function MemberForm({ member }: { member?: MemberDetail }) {
-  const { current, branchId, href } = useAdminContext();
+  const { current, branchId, isBranchLocked, href } = useAdminContext();
   const router = useRouter();
   const mutation = useMemberMutation(member ? 'update' : 'create', member?.id);
   const timezone = current?.business.timezone || 'Asia/Kolkata';
@@ -38,7 +38,11 @@ function MemberForm({ member }: { member?: MemberDetail }) {
   } = useForm<MemberFormValues>({
     resolver: zodResolver(memberSchema(timezone)),
     defaultValues: {
-      branchId: member ? member.branchId || '' : branchId || '',
+      branchId: member
+        ? member.branchId || ''
+        : isBranchLocked && current?.assignedBranchId
+          ? current.assignedBranchId
+          : branchId || '',
       fullName: member?.fullName || '',
       phone: member?.phone || '',
       joiningDate: member?.joiningDate || calendarToday(timezone),
@@ -211,7 +215,7 @@ function MemberForm({ member }: { member?: MemberDetail }) {
                     aria-label="Registration branch"
                     {...register('branchId')}
                   >
-                    <option value="">Unassigned</option>
+                    {!isBranchLocked && <option value="">Unassigned</option>}
                     {current?.business.branches
                       .filter(
                         (b) =>

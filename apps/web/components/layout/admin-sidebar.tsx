@@ -1,41 +1,98 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Dumbbell, ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown, Building2 } from 'lucide-react';
 import { useAdminContext } from '@/features/admin/admin-context';
+import { resolveLogoUrl } from '@/lib/api/auth-api';
 import { cn } from '@/lib/utils';
 import { navigation } from './admin-navigation';
+
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { current, businesses, selectBusiness, href } = useAdminContext();
+  const {
+    current,
+    businesses,
+    selectBusiness,
+    href,
+    hasPermission,
+    isBranchLocked,
+    assignedBranchName,
+  } = useAdminContext();
+  const logoUrl = resolveLogoUrl(current?.business.logoUrl);
+
+  const filteredNav = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => hasPermission(item.section)),
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
     <>
       <Link
         href={href('/admin/dashboard')}
         onClick={onNavigate}
-        className="flex h-[76px] shrink-0 items-center gap-3 px-6"
+        className="flex h-[72px] shrink-0 items-center gap-3 border-b border-slate-100 px-5"
       >
-        <span className="flex size-9 items-center justify-center rounded-xl bg-blue-700 text-white">
-          <Dumbbell size={21} aria-hidden="true" />
-        </span>
-        <span className="text-lg font-bold tracking-tight text-slate-900">
-          Gym<span className="font-normal text-slate-500"> workspace</span>
-        </span>
+        {logoUrl ? (
+          <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-0.5 shadow-xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoUrl}
+              alt=""
+              className="max-h-full max-w-full object-contain"
+            />
+          </span>
+        ) : (
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
+            <span className="text-sm font-semibold" aria-hidden="true">
+              {current?.business.name.slice(0, 1).toUpperCase() || 'G'}
+            </span>
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold tracking-tight text-slate-950 leading-tight">
+            {current?.business.name || 'Gym'}
+          </p>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500"
+            >
+              {current?.role || 'Staff'}
+            </span>
+          </div>
+        </div>
       </Link>
+
+      {isBranchLocked && assignedBranchName && (
+        <div className="mx-3 mb-2 rounded-lg border border-purple-200/60 bg-purple-50/60 p-2.5 text-xs text-purple-900">
+          <p className="flex items-center gap-1.5 font-semibold text-[11px]">
+            <Building2 size={13} aria-hidden="true" />
+            Branch Scoped
+          </p>
+          <p className="mt-0.5 truncate text-[11px] text-purple-700">
+            {assignedBranchName}
+          </p>
+        </div>
+      )}
+
       <nav
         aria-label="Admin navigation"
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-5"
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5"
       >
-        {navigation.map((group) => (
+        {filteredNav.map((group) => (
           <div key={group.label}>
-            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">
               {group.label}
             </p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
+                const basePath = item.path.split('?')[0]!;
                 const active =
-                  pathname === item.path ||
-                  pathname.startsWith(`${item.path}/`);
+                  pathname === basePath ||
+                  (basePath !== '/admin/dashboard' &&
+                    basePath !== '/admin/attendance' &&
+                    pathname.startsWith(`${basePath}/`));
                 return (
                   <li key={item.path}>
                     <Link
@@ -43,20 +100,19 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       aria-current={active ? 'page' : undefined}
                       onClick={onNavigate}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950',
+                        'flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950',
                         active &&
-                          'bg-blue-50 text-blue-700 hover:bg-blue-50 hover:text-blue-700',
+                          'bg-slate-100 font-semibold text-slate-950 hover:bg-slate-100 hover:text-slate-950',
                       )}
                     >
                       <item.icon
                         size={17}
-                        strokeWidth={1.8}
+                        strokeWidth={active ? 2.1 : 1.8}
+                        className={cn(active ? 'text-slate-950' : 'text-slate-400')}
                         aria-hidden="true"
                       />
-                      {item.label}
-                      {active && (
-                        <span className="ml-auto size-1.5 rounded-full bg-blue-600" />
-                      )}
+                      <span className="truncate">{item.label}</span>
+                      {active && <span className="ml-auto h-4 w-0.5 rounded-full bg-slate-950" />}
                     </Link>
                   </li>
                 );
@@ -65,32 +121,14 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-slate-100 p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-600"
-            aria-hidden="true"
-          >
-            {current?.business.name.slice(0, 1).toUpperCase() || 'G'}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p
-              className="truncate text-xs font-semibold text-slate-800"
-              title={current?.business.name}
-            >
-              {current?.business.name || 'Your gym'}
-            </p>
-            <p className="mt-0.5 text-xs capitalize text-slate-500">
-              {current?.role.toLowerCase() || 'Workspace'}
-            </p>
-          </div>
-        </div>
-        {businesses.length > 1 && (
-          <label className="relative mt-3">
+
+      {businesses.length > 1 && (
+        <div className="shrink-0 border-t border-slate-100 p-3">
+          <label className="relative mt-3 block">
             <span className="sr-only">Business</span>
             <select
               aria-label="Business"
-              className="h-9 appearance-none rounded-lg border-slate-200 py-1 pr-7 text-xs"
+              className="h-9 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1 pr-7 text-xs font-medium text-slate-700 shadow-2xs"
               value={current?.businessId || ''}
               onChange={(event) => selectBusiness(event.target.value)}
             >
@@ -111,8 +149,8 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
               aria-hidden="true"
             />
           </label>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

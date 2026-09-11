@@ -15,15 +15,20 @@ interface AdminContextValue {
   current?: BusinessAccess;
   businesses: BusinessAccess[];
   branchId?: string;
+  isBranchLocked: boolean;
+  assignedBranchName?: string | null;
   pending: boolean;
   error: Error | null;
   invalidBusiness: boolean;
   retry: () => void;
   selectBusiness: (id: string) => void;
   selectBranch: (id: string) => void;
+  hasPermission: (sectionSlug: string) => boolean;
   href: (path: string) => string;
 }
+
 const AdminContext = createContext<AdminContextValue | null>(null);
+
 export function AdminProvider({ children }: { children: ReactNode }) {
   const access = useBusinessAccess();
   const [switching, startSwitch] = useTransition();
@@ -34,7 +39,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const current = requested
     ? access.data?.find((item) => item.businessId === requested)
     : access.data?.[0];
-  const requestedBranch = params.get('branchId') || undefined;
+
+  const assignedBranchId = current?.assignedBranchId;
+  const isBranchLocked = !!assignedBranchId;
+  const assignedBranchName =
+    current?.assignedBranch?.name ||
+    current?.business.branches.find((b) => b.id === assignedBranchId)?.name ||
+    null;
+
+  const requestedBranch = isBranchLocked
+    ? assignedBranchId
+    : params.get('branchId') || undefined;
+
   const invalidBranchSelection =
     !!requestedBranch &&
     !!current &&
@@ -42,12 +58,23 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       (branch) => branch.id === requestedBranch && branch.status === 'ACTIVE',
     );
   const branchId = invalidBranchSelection ? undefined : requestedBranch;
+
   useEffect(() => {
     if (!invalidBranchSelection) return;
     const query = new URLSearchParams(params.toString());
     query.delete('branchId');
     router.replace(`${pathname}?${query}`, { scroll: false });
   }, [invalidBranchSelection, params, pathname, router]);
+
+  // Sync branchId into URL if user is locked to a branch
+  useEffect(() => {
+    if (isBranchLocked && assignedBranchId && params.get('branchId') !== assignedBranchId) {
+      const query = new URLSearchParams(params.toString());
+      query.set('branchId', assignedBranchId);
+      router.replace(`${pathname}?${query}`, { scroll: false });
+    }
+  }, [isBranchLocked, assignedBranchId, params, pathname, router]);
+
   useEffect(() => {
     if (sessionStorage.getItem(inviteStorageKey)) router.replace('/invite');
     else if (access.data?.length === 0) {
@@ -64,24 +91,41 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       };
     }
   }, [access.data, router]);
+
+  function hasPermission(section: string): boolean {
+    if (!current) return true;
+    if (current.role === 'OWNER' || current.role === 'ADMIN') return true;
+    if (current.role === 'MANAGER') {
+      const perms = current.permissions;
+      if (!perms || !Array.isArray(perms) || perms.length === 0) return true;
+      return perms.includes(section);
+    }
+    return true;
+  }
+
   function href(path: string) {
-    const query = new URLSearchParams();
+    const target = new URL(path, 'http://local');
+    const query = new URLSearchParams(target.search);
     if (current) query.set('businessId', current.businessId);
     if (branchId) query.set('branchId', branchId);
-    return query.size ? `${path}?${query}` : path;
+    return `${target.pathname}${query.size ? `?${query}` : ''}${target.hash}`;
   }
+
   return (
     <AdminContext.Provider
       value={{
         current,
         businesses: access.data || [],
         branchId,
+        isBranchLocked,
+        assignedBranchName,
         pending: access.isPending || switching,
         error: access.error,
         invalidBusiness: !!requested && !!access.data?.length && !current,
         retry: () => {
           void access.refetch();
         },
+        hasPermission,
         href,
         selectBusiness: (id) => {
           const query = new URLSearchParams(params.toString());
@@ -100,6 +144,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           );
         },
         selectBranch: (id) => {
+          if (isBranchLocked) return;
           const query = new URLSearchParams(params.toString());
           query.delete('page');
           query.delete('notice');
@@ -122,6 +167,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     </AdminContext.Provider>
   );
 }
+
 export function useAdminContext() {
   const context = useContext(AdminContext);
   if (!context) throw new Error('AdminProvider is required');

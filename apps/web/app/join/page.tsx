@@ -12,7 +12,7 @@ import {
 } from '@/features/qr/fragment';
 import { AuthPanel } from '@/components/auth-panel';
 import { browserAuth } from '@/lib/supabase/client';
-import { api } from '@/lib/api/auth-api';
+import { api, resolveLogoUrl } from '@/lib/api/auth-api';
 
 type EmergencyContact = { name: string; phone: string; relationship: string };
 const emptyContact = (): EmergencyContact => ({
@@ -147,7 +147,19 @@ export default function Page() {
         </>
       ) : branch.data ? (
         <>
-          <h2>{branch.data.businessName}</h2>
+          <div className="flex items-center gap-3">
+            {branch.data.businessLogoUrl ? (
+              <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resolveLogoUrl(branch.data.businessLogoUrl) || ''}
+                  alt=""
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : null}
+            <h2 className="text-xl font-bold text-slate-900">{branch.data.businessName}</h2>
+          </div>
           <div className="grid gap-3 rounded-lg bg-blue-50 p-4 text-sm sm:grid-cols-2">
             <div>
               <span className="text-slate-500">Registration branch</span>

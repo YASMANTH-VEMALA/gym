@@ -8,6 +8,7 @@ import { Bell, ChevronDown, LogOut, MapPin, Settings2 } from 'lucide-react';
 import { useAdminContext } from '@/features/admin/admin-context';
 import { useAccountProfile } from '@/features/admin/use-business-access';
 import { browserAuth } from '@/lib/supabase/client';
+import { resolveLogoUrl } from '@/lib/api/auth-api';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -22,7 +23,8 @@ export function AdminTopbar({ mobileTrigger }: { mobileTrigger: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const cache = useQueryClient();
-  const { current, branchId, selectBranch, href } = useAdminContext();
+  const { current, branchId, isBranchLocked, assignedBranchName, selectBranch, href } = useAdminContext();
+  const logoUrl = resolveLogoUrl(current?.business.logoUrl);
   const profile = useAccountProfile();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,43 +33,60 @@ export function AdminTopbar({ mobileTrigger }: { mobileTrigger: ReactNode }) {
     !current?.business.branches.some((branch) => branch.id === branchId);
   return (
     <>
-      <header className="sticky top-0 z-20 flex min-h-[76px] flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-7">
+      <header className="sticky top-0 z-20 flex min-h-[72px] flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-7">
         <div className="flex items-center gap-3">
           {mobileTrigger}
-          <p className="text-sm font-semibold text-slate-800">
+          {logoUrl ? (
+            <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-0.5 sm:hidden shadow-xs">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          ) : null}
+          <p className="text-sm font-medium text-slate-600">
             {pageTitle(pathname)}
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
-          <label className="relative">
-            <span className="sr-only">Branch</span>
-            <MapPin
-              className="pointer-events-none absolute left-3 top-3 text-slate-500"
-              size={15}
-              aria-hidden="true"
-            />
-            <select
-              aria-label="Branch"
-              className="h-10 w-36 rounded-lg border-slate-200 py-2 pl-9 text-xs sm:w-44"
-              value={branchId || ''}
-              disabled={!current}
-              onChange={(event) => selectBranch(event.target.value)}
-            >
-              <option value="">All Branches</option>
-              {unavailable && (
-                <option value={branchId} disabled>
-                  Unavailable branch
-                </option>
-              )}
-              {current?.business.branches
-                .filter((branch) => branch.status === 'ACTIVE')
-                .map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
+          {isBranchLocked ? (
+            <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs font-semibold text-purple-900 shadow-2xs">
+              <MapPin size={14} className="text-purple-700" />
+              <span className="truncate max-w-[140px] sm:max-w-[200px]">{assignedBranchName || 'My Branch'}</span>
+            </div>
+          ) : (
+            <label className="relative">
+              <span className="sr-only">Branch</span>
+              <MapPin
+                className="pointer-events-none absolute left-3 top-3 text-slate-500"
+                size={15}
+                aria-hidden="true"
+              />
+              <select
+                aria-label="Branch"
+                className="h-9 w-36 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-7 text-xs font-medium text-slate-700 shadow-none sm:w-44"
+                value={branchId || ''}
+                disabled={!current}
+                onChange={(event) => selectBranch(event.target.value)}
+              >
+                <option value="">All Branches</option>
+                {unavailable && (
+                  <option value={branchId} disabled>
+                    Unavailable branch
                   </option>
-                ))}
-            </select>
-          </label>
+                )}
+                {current?.business.branches
+                  .filter((branch) => branch.status === 'ACTIVE')
+                  .map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

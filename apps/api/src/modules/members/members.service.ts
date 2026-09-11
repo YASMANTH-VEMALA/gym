@@ -50,8 +50,9 @@ export class MembersService {
     const access = await tx.businessAccess.findUnique({
       where: { businessId_userId: { businessId, userId } },
     });
-    if (!access || !['OWNER', 'ADMIN'].includes(access.role))
+    if (!access || !['OWNER', 'ADMIN', 'MANAGER'].includes(access.role))
       throw new ForbiddenException('You do not have access to this business');
+    return access;
   }
   private async find(
     tx: Prisma.TransactionClient,
@@ -226,19 +227,28 @@ export class MembersService {
     businessId: string,
     query: ListMembersDto,
   ): Promise<MemberList> {
-    await this.access(this.database.db, businessId, userId);
-    if (
-      query.branchId &&
-      !(await this.database.db.branch.findFirst({
-        where: { id: query.branchId, businessId },
-      }))
-    )
-      throw new ForbiddenException('Branch does not belong to this business');
+    const access = await this.access(this.database.db, businessId, userId);
+    let effectiveBranchId = query.branchId;
+    if (access.assignedBranchId) {
+      if (query.branchId && query.branchId !== access.assignedBranchId) {
+        throw new ForbiddenException(
+          'You only have access to your assigned branch',
+        );
+      }
+      effectiveBranchId = access.assignedBranchId;
+    } else if (query.branchId) {
+      if (
+        !(await this.database.db.branch.findFirst({
+          where: { id: query.branchId, businessId },
+        }))
+      )
+        throw new ForbiddenException('Branch does not belong to this business');
+    }
     const search = query.search;
     const phoneSearch = search ? normalizeMemberPhone(search) : '';
     const where: Prisma.MemberWhereInput = {
       businessId,
-      ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(effectiveBranchId ? { branchId: effectiveBranchId } : {}),
       ...(query.status === 'ALL' ? {} : { status: query.status }),
       ...(search
         ? {
@@ -267,7 +277,7 @@ export class MembersService {
       ? await this.database.db.$queryRaw<
           Array<{ memberId: string; outstanding: bigint; memberships: bigint }>
         >(
-          Prisma.sql`${ledger(businessId)} SELECT "memberId",sum("outstandingMinor")::bigint AS outstanding,count(*)::bigint AS memberships FROM ledger WHERE "memberId" IN (${Prisma.join(items.map((m) => Prisma.sql`${m.id}::uuid`))}) ${query.branchId ? Prisma.sql`AND "branchId"=${query.branchId}::uuid` : Prisma.empty} GROUP BY "memberId"`,
+          Prisma.sql`${ledger(businessId)} SELECT "memberId",sum("outstandingMinor")::bigint AS outstanding,count(*)::bigint AS memberships FROM ledger WHERE "memberId" IN (${Prisma.join(items.map((m) => Prisma.sql`${m.id}::uuid`))}) ${effectiveBranchId ? Prisma.sql`AND "branchId"=${effectiveBranchId}::uuid` : Prisma.empty} GROUP BY "memberId"`,
         )
       : [];
     const byMember = new Map(balances.map((b) => [b.memberId, b]));

@@ -26,7 +26,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     selectBusiness,
   } = useAdminContext();
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-slate-900">
+    <div className="min-h-screen bg-[#f6f6f4] text-slate-900">
       <a
         href="#admin-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[70] focus:rounded-md focus:bg-white focus:p-3"
@@ -61,7 +61,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <main
           id="admin-content"
           tabIndex={-1}
-          className="mx-auto max-w-[1500px] p-4 outline-none sm:p-7 xl:p-8"
+          className="mx-auto max-w-[1440px] p-4 outline-none sm:p-7 xl:p-8"
         >
           {pending ? (
             <div

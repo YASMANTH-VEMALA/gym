@@ -2,6 +2,7 @@ import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsIn,
+  IsOptional,
   IsString,
   Length,
   Matches,
@@ -31,7 +32,60 @@ export class InviteDto {
   @IsEmail()
   @MaxLength(254)
   email!: string;
+
+  @IsOptional()
+  @IsIn(['ADMIN', 'MANAGER'])
+  role?: 'ADMIN' | 'MANAGER';
+
+  @IsOptional()
+  @IsString()
+  assignedBranchId?: string | null;
+
+  @IsOptional()
+  permissions?: string[];
 }
+export class UpdateAccessDto {
+  @IsOptional()
+  @IsIn(['ADMIN', 'MANAGER'])
+  role?: 'ADMIN' | 'MANAGER';
+
+  @IsOptional()
+  @IsString()
+  assignedBranchId?: string | null;
+
+  @IsOptional()
+  permissions?: string[];
+}
+
 export class AcceptInviteDto {
   @IsString() @Matches(/^[A-Za-z0-9_-]{43}$/) token!: string;
+}
+
+export class UpdateBusinessProfileDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  name?: string;
+
+  @IsOptional()
+  @IsIn(['INR', 'USD', 'EUR', 'GBP', 'AED'])
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  timezone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3500000)
+  logoDataUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  logoUrl?: string | null;
 }

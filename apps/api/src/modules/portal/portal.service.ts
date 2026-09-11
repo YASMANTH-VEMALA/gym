@@ -59,7 +59,7 @@ export class PortalService {
         member: {
           select: { fullName: true, memberNumber: true, status: true },
         },
-        business: { select: { name: true, currency: true, timezone: true } },
+        business: { select: { name: true, currency: true, timezone: true, logoUrl: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
